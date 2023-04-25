@@ -7,6 +7,7 @@
 
  
  //    Leds 
+ int ledmangueira_pin = 17;
  int ledmanual1_pin = 3;
  int ledmanual2_pin = 4;
  int ledmanual3_pin = 5;
@@ -66,7 +67,8 @@ void setup() {
   //pins and settings declared 
      myRTC.begin();    
      setSyncProvider(myRTC.get);
-          
+
+     pinMode(ledmangueira_pin, OUTPUT);
      pinMode(ledauto1_pin, OUTPUT);
      pinMode(ledauto2_pin, OUTPUT);
      pinMode(ledauto3_pin, OUTPUT); 
@@ -88,7 +90,8 @@ void setup() {
      pinMode(valve3_pin, OUTPUT);
      pinMode(valvemangueira_pin, OUTPUT);
      pinMode(motorrelay_pin, OUTPUT);        
- 
+
+     digitalWrite(ledmangueira_pin, LOW);
      digitalWrite(ledauto1_pin, LOW);
      digitalWrite(ledauto2_pin, LOW); 
      digitalWrite(ledauto3_pin, LOW);   
@@ -110,7 +113,7 @@ void setup() {
       Alarm.alarmRepeat(dowFriday,9,0,0,WeeklyAlarmdst);  // TEMPO EM UTC !!  hora real verao(dst) = utc   || hora real inverno = utc-1
       Alarm.alarmRepeat(dowFriday,10,0,0,WeeklyAlarm); // Alarme de inverno
       
-      myRTC.writeRTC(16,0); // RTC aging offset (+1 = 0.1ppm) Fazer as contas para afinar na proxima "manutenção"
+      myRTC.writeRTC(16,-30); // RTC aging offset (+1 = 0.1ppm) Fazer as contas para afinar na proxima "manutenção" Tava atrasado o relogio entao valor negativo para o relogio acelerar
       wdt_enable(WDTO_8S);  // watchdog       
  }
  
@@ -142,7 +145,7 @@ void readpins_func(){
   
     //  Read switches states
     
-  if(digitalRead(manualsw1_pin) == HIGH && digitalRead(manualsw2_pin) == HIGH && digitalRead(manualsw3_pin) == HIGH){
+  if(digitalRead(manualsw1_pin) == HIGH && digitalRead(manualsw2_pin) == HIGH && digitalRead(manualsw3_pin) == HIGH && mangueira_bool == false){
     touched = 0;
   }
 
@@ -151,7 +154,7 @@ void readpins_func(){
       touched = 1;    
      if(run1 == 0){
       start1 = 1;
-      timeset1_millis = 20 * minutos;
+      timeset1_millis = 30 * minutos;
       digitalWrite(ledmanual1_pin, HIGH);
       }
      else{
@@ -165,7 +168,7 @@ void readpins_func(){
       touched = 1;         
      if(run2 == 0){
       start2 = 1;
-      timeset2_millis = 20 * minutos;
+      timeset2_millis = 30 * minutos;
       digitalWrite(ledmanual2_pin, HIGH);
       }
      else{
@@ -179,7 +182,7 @@ void readpins_func(){
       touched = 1;   
      if(run3 == 0){
       start3 = 1;
-      timeset3_millis = 20 * minutos;
+      timeset3_millis = 30 * minutos;
       digitalWrite(ledmanual3_pin, HIGH);
       }
      else{
@@ -193,7 +196,8 @@ void readpins_func(){
           // Start and Stop switches
  
    if(digitalRead(startsw_pin) == LOW && aspersor_bool == false && mangueira_bool == false){ // "bool == false" Makes it so it only works when everything is off                
-     start0 = 1;     
+     start0 = 1;
+     touched = 1;     
     }
     
    if(digitalRead(stopsw_pin) == LOW) { 
@@ -205,7 +209,8 @@ void readpins_func(){
     start0 = 0;
     start1 = 0;
     start2 = 0;
-    start3 = 0;         
+    start3 = 0;
+    digitalWrite(ledmangueira_pin, LOW);         
     digitalWrite(ledmanual1_pin, LOW);
     digitalWrite(ledmanual2_pin, LOW);
     digitalWrite(ledmanual3_pin, LOW);
@@ -271,19 +276,21 @@ void readauto_func(){
 
 void runmotor_func(){
 
-      //Start mangueira, only if aspersor is not on
+      //Start mangueira, only if aspersor is off
   
   if(start0 == 1 && aspersor_bool == false){
     start0 = 0; 
     mangueira_bool = true;  
     timestart0_millis = millis();    
     timeset0_millis = 40 * minutos;
-    digitalWrite(valvemangueira_pin, HIGH);    
+    digitalWrite(valvemangueira_pin, HIGH);
+    digitalWrite(ledmangueira_pin, HIGH);    
   }
 
       // Check mangueira timer
 
   if( milli(timestart0_millis) > timeset0_millis && mangueira_bool == true){
+    digitalWrite(ledmangueira_pin, LOW);
     digitalWrite(valvemangueira_pin, LOW);
     mangueira_bool = false;
   }
@@ -291,7 +298,7 @@ void runmotor_func(){
       //Start aspersor, start timers
   
   if(mangueira_bool == false){ 
-    if(start1 == 1 && milli(inrush_millis) > 1000){
+    if(start1 == 1 && milli(inrush_millis) > 2000){
       start1 = 0;
       run1 = 1;
       inrush_millis = millis();
@@ -299,7 +306,7 @@ void runmotor_func(){
       aspersor_bool = true;
       timestart1_millis = millis();               
     }
-    if(start2 == 1 && milli(inrush_millis) > 1000){
+    if(start2 == 1 && milli(inrush_millis) > 2000){
       start2 = 0;
       run2 = 1;
       inrush_millis = millis();
@@ -307,7 +314,7 @@ void runmotor_func(){
       aspersor_bool = true;   
       timestart2_millis = millis();   
     }
-    if(start3 == 1 && milli(inrush_millis) > 1000){
+    if(start3 == 1 && milli(inrush_millis) > 2000){
       start3 = 0;
       run3 = 1;
       inrush_millis = millis();
@@ -371,12 +378,12 @@ void WeeklyAlarmdst(){  // alarme verao
 void alarm_func(){
   unsigned long timesetalarm=0;
   
-  timesetalarm = 15*minutos ;      //Nov,Dez,Jan,Fev,Mar
+  timesetalarm = 20*minutos ;      //Nov,Dez,Jan,Fev,Mar
   if(month() > 3 && month() < 11){
-    timesetalarm = 20*minutos;      //Abr,Mai,Set,Out
+    timesetalarm = 30*minutos;      //Abr,Mai,Set,Out
     }
   if(month() > 5 && month() < 9){
-    timesetalarm = 30*minutos;  //Jun,Jul,Ago
+    timesetalarm = 40*minutos;  //Jun,Jul,Ago
     }
   
   if(auto1_bool == 1){
